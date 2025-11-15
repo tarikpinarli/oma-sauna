@@ -62,7 +62,8 @@ def generate_recommendation_endpoint(data: InputData):
     }
 
     # 4) Save to Supabase
-    supabase.table("recommendations").insert(payload).execute()
+    supabase.table("daily_recommendations").insert(payload).execute()
+
 
     # 5) Return to caller
     return payload
