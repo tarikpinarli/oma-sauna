@@ -21,34 +21,31 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # you can restrict later
+    allow_origins=["*"],  # tighten later if you want
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------- Input model (what Figma / Make sends) ----------
+# ---------- Input model ----------
 class InputData(BaseModel):
-    user_id: str  # who this recommendation belongs to
+    user_id: str
 
 
-# ---------- DB location & query ----------
+# ---------- SQLite config ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "recommendation.db")
 
-# 👇 Adjust these if your sqlite schema is different
 SQL_SELECT_LATEST = """
-    SELECT temp, humidity, duration
+    SELECT recommended_temp, recommended_hum, recommended_duration
     FROM recommendations
-    ORDER BY id DESC
+    ORDER BY rowid DESC
     LIMIT 1;
 """
 
 
 def read_latest_from_sqlite():
-    """
-    Open recommendation.db and read the latest temp, humidity, duration.
-    """
+    """Read latest (temp, hum, duration) from recommendation.db."""
     if not os.path.exists(DB_PATH):
         raise FileNotFoundError(f"Database file not found at: {DB_PATH}")
 
@@ -63,16 +60,16 @@ def read_latest_from_sqlite():
     if row is None:
         raise ValueError("No rows found in recommendations table")
 
-    temp, humidity, duration = row
-    return temp, humidity, duration
+    recommended_temp, recommended_hum, recommended_duration = row
+    return recommended_temp, recommended_hum, recommended_duration
 
 
 @app.post("/generate-recommendation")
 def generate_recommendation_endpoint(data: InputData):
     """
-    1. Read latest sauna recommendation from recommendation.db
-    2. Insert {user_id, temp, humidity, duration} into Supabase (daily_recommendations)
-    3. Return the same payload as JSON
+    1. Read latest recommendation from recommendation.db
+    2. Insert {user_id, temp, humidity, duration} into Supabase
+    3. Return same payload as JSON
     """
     try:
         temp, humidity, duration = read_latest_from_sqlite()
@@ -88,7 +85,6 @@ def generate_recommendation_endpoint(data: InputData):
         "duration": duration,
     }
 
-    # Insert into Supabase table
     try:
         supabase.table("daily_recommendations").insert(payload).execute()
     except Exception as e:
