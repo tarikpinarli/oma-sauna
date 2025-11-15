@@ -33,21 +33,36 @@ class InputData(BaseModel):
 
 @app.post("/generate-recommendation")
 def generate_recommendation_endpoint(data: InputData):
-    # 1) Run your Python logic
+    # 1) Run your Python recommendation logic
     result = generate_recommendation(
         user_id=data.user_id,
         steps=data.steps,
         heart_rate=data.heart_rate,
     )
 
-    # 2) Save to Supabase
-    supabase.table("recommendations").insert({
-        "user_id": result["user_id"],
-        "steps": result["steps"],
-        "heart_rate": result["heart_rate"],
-        "score": result["score"],
-        "recommendation": result["recommendation"],
-    }).execute()
+    print("DEBUG result from generate_recommendation:", result)
 
-    # 3) Return to caller (Figma / Make / whatever)
-    return result
+    # 2) Normalize result
+    score = None
+    recommendation = None
+
+    if isinstance(result, dict):
+        score = result.get("score")
+        recommendation = result.get("recommendation") or str(result)
+    else:
+        recommendation = str(result)
+
+    # 3) Build payload to save & return
+    payload = {
+        "user_id": data.user_id,
+        "steps": data.steps,
+        "heart_rate": data.heart_rate,
+        "score": score,
+        "recommendation": recommendation,
+    }
+
+    # 4) Save to Supabase
+    supabase.table("recommendations").insert(payload).execute()
+
+    # 5) Return to caller
+    return payload
